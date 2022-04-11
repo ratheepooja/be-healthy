@@ -1,0 +1,93 @@
+---
+title: "Be-Healthy"
+author: "Pooja Rathee"
+output:
+  pdf_document: default
+date: '2022-04-08'
+---
+## First we install required packages and go through it
+```{r}
+library(tidyverse)
+```
+
+## Read csv file
+```{r}
+daily_activity <- read_csv("dailyActivity_merged.csv")
+sleep_day <- read.csv("sleepDay_merged.csv")
+```
+
+## Take a look at the daily activity data
+```{r}
+head(daily_activity)
+```
+
+# Identify all the columns in daily_activity
+```{r}
+colnames(daily_activity)
+```
+# Take a look at the sleep data
+```{r}
+head(sleep_day)
+```
+
+# Idenify all the columns in sleep day
+```{r}
+colnames(sleep_day)
+```
+# Understanding some summary statistics
+```{r distinct users}
+n_distinct(daily_activity$Id)
+n_distinct(sleep_day$Id)
+
+```
+# Calculate the observations 
+```{r observations}
+nrow(daily_activity)
+nrow(sleep_day)
+```
+# summary statistics of daily activity
+```{r}
+daily_activity %>%  
+  select(TotalSteps,
+         TotalDistance,
+         SedentaryMinutes) %>%
+  summary()
+```
+# For the sleep dataframe
+```{r}
+sleep_day %>%  
+  select(TotalSleepRecords,
+  TotalMinutesAsleep,
+  TotalTimeInBed) %>%
+  summary()
+```
+```{r}
+ggplot(data=daily_activity, aes(x=TotalSteps, y=SedentaryMinutes)) + geom_point()+
+  labs(title ="Relationship between total steps and Sedentary Minutes")
+```
+# plotting the graph for sleep_day
+```{r}
+ggplot(data=sleep_day, aes(x=TotalMinutesAsleep, y=TotalTimeInBed)) + geom_point() +
+  labs(title = "Relationship between total minutes asleep and total time in bed")
+```
+What's the relationship between minutes asleep and time in bed? You might expect it to be almost completely linear - are there any unexpected trends?
+
+```{r}
+ggplot(data=sleep_day, aes(x=TotalMinutesAsleep, y=TotalTimeInBed)) + geom_point()
+```
+
+What could these trends tell you about how to help market this product? Or areas where you might want to explore further?
+
+## Merging these two datasets together
+
+```{r}
+combined_data <- merge(sleep_day, daily_activity, by="Id")
+```
+
+# How many participants are there in data
+```{r}
+n_distinct(combined_data$Id)
+```
+
+
+# There were more participant Ids in the daily activity dataset that have been filtered out using merge.
