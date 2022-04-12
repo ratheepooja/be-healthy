@@ -8,89 +8,88 @@ date: '2022-04-08'
 ## First we install required packages and go through it
 ```{r}
 library(tidyverse)
+library(ggplot2)
+
 ```
 
 ## Read csv file
 ```{r}
-daily_activity <- read_csv("dailyActivity_merged.csv")
-sleep_day <- read.csv("sleepDay_merged.csv")
+daily_calories <- read_csv("data/dailyCalories_merged.csv")
+weight_log <- read.csv("data/weightLogInfo_merged.csv")
 ```
 
-## Take a look at the daily activity data
+## Take a look at the daily calories data
 ```{r}
-head(daily_activity)
+head(daily_calories)
 ```
 
 # Identify all the columns in daily_activity
 ```{r}
-colnames(daily_activity)
+colnames(daily_calories)
 ```
-# Take a look at the sleep data
+# Take a look at the weight_log
 ```{r}
-head(sleep_day)
+head(weight_log)
 ```
 
-# Idenify all the columns in sleep day
+# Idenify all the columns in weight log
 ```{r}
-colnames(sleep_day)
+colnames(weight_log)
 ```
 # Understanding some summary statistics
 ```{r distinct users}
-n_distinct(daily_activity$Id)
-n_distinct(sleep_day$Id)
+n_distinct(daily_calories$Id)
+n_distinct(weight_log$Id)
 
 ```
 # Calculate the observations 
 ```{r observations}
-nrow(daily_activity)
-nrow(sleep_day)
+nrow(daily_calories)
+nrow(weight_log)
 ```
-# summary statistics of daily activity
+# summary statistics of daily calories
 ```{r}
-daily_activity %>%  
-  select(TotalSteps,
-         TotalDistance,
-         SedentaryMinutes) %>%
+daily_calories %>%  
+  select(Id,
+         ActivityDay,
+         Calories) %>%
   summary()
 ```
-# For the sleep dataframe
+# For the weight_log dataframe
 ```{r}
-sleep_day %>%  
-  select(TotalSleepRecords,
-  TotalMinutesAsleep,
-  TotalTimeInBed) %>%
+weight_log %>%  
+  select(Id,
+  Date,
+  WeightKg, BMI,Fat) %>%
   summary()
 ```
 ```{r}
-ggplot(data=daily_activity, aes(x=TotalSteps, y=SedentaryMinutes)) + geom_point()+
-  labs(title ="Relationship between total steps and Sedentary Minutes")
+ggplot(data=daily_calories, aes(x=ActivityDay, y=Calories, fill=Id)) + geom_point()+
+  labs(title ="Relationship between ActivityDay and Calories Intake") 
 ```
-# plotting the graph for sleep_day
+# plotting the graph for weight_log
 ```{r}
-ggplot(data=sleep_day, aes(x=TotalMinutesAsleep, y=TotalTimeInBed)) + geom_point() +
-  labs(title = "Relationship between total minutes asleep and total time in bed")
-```
-What's the relationship between minutes asleep and time in bed? You might expect it to be almost completely linear - are there any unexpected trends?
-
-```{r}
-ggplot(data=sleep_day, aes(x=TotalMinutesAsleep, y=TotalTimeInBed)) + geom_point()
+ggplot(data=weight_log, aes(x=Date, y=BMI, fill=Id)) + geom_point() +
+  labs(title = "Relationship between Date and BMI rate as per Id's")
 ```
 
 What could these trends tell you about how to help market this product? Or areas where you might want to explore further?
 
 ## Merging these two datasets together
+How Calories intake and BMI rate influences health?
 
 ```{r}
-combined_data <- merge(sleep_day, daily_activity, by="Id")
+combined_data <- merge(weight_log, daily_calories, by="Id")
+ggplot(data=combined_data,aes(x=Calories, y=BMI)) + 
+  geom_line()
 ```
 
 # How many participants are there in data
 ```{r}
+ggplot(data=combined_data,aes(x=Id, y=BMI)) + 
+  geom_line()
 n_distinct(combined_data$Id)
 ```
 
 
-# There were more participant Ids in the daily activity dataset that have been filtered out using merge.
-
-
-# Example change for git
+# There were more participant Ids in the daily calories dataset that have been filtered out using merge.
