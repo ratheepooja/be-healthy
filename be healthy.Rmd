@@ -5,91 +5,174 @@ output:
   pdf_document: default
 date: '2022-04-08'
 ---
-## First we install required packages and go through it
+
+## First we install required packages and go through them
+
 ```{r}
 library(tidyverse)
-library(ggplot2)
+library(ggplot2) 
+library(scales)
+
 
 ```
 
-## Read csv file
+#Importing the required data
+
 ```{r}
-daily_calories <- read_csv("data/dailyCalories_merged.csv")
-weight_log <- read.csv("data/weightLogInfo_merged.csv")
+
+Activity <- read.csv("data/dailyActivity_merged.csv")
+Calories<- read.csv("data/hourlyCalories_merged.csv")
+Intensities <- read.csv("data/hourlyIntensities_merged.csv")
+sleepDay <- read.csv("data/sleepDay_merged.csv")
+weight <- read.csv("data/weightLogInfo_merged.csv")
+
 ```
 
-## Take a look at the daily calories data
+## A quick look in the following columns
+
 ```{r}
-head(daily_calories)
+colnames(Activity)
+colnames(Calories)
+colnames(Intensities)
+colnames(sleepDay)
+colnames(weight)
+
+```
+# Run the Head function
+
+```{r}
+head(Activity)
+head(Calories)
+head(Intensities)
+head(sleepDay)
+head(weight)
 ```
 
-# Identify all the columns in daily_activity
+## Take a look at the following data and format as date and time
+
 ```{r}
-colnames(daily_calories)
-```
-# Take a look at the weight_log
-```{r}
-head(weight_log)
+# intensities
+Intensities$ActivityHour=as.POSIXct(Intensities$ActivityHour, format="%m/%d/%Y %I:%M:%S %p", tz=Sys.timezone())
+Intensities$time <- format(Intensities$ActivityHour, format = "%H:%M:%S")
+Intensities$date <- format(Intensities$ActivityHour, format = "%m/%d/%y")
+# calories
+Calories$ActivityHour=as.POSIXct(Calories$ActivityHour, format="%m/%d/%Y %I:%M:%S %p", tz=Sys.timezone())
+Calories$time <- format(Calories$ActivityHour, format = "%H:%M:%S")
+Calories$date <- format(Calories$ActivityHour, format = "%m/%d/%y")
+# activity
+Activity$ActivityDate=as.POSIXct(Activity$ActivityDate, format="%m/%d/%Y", tz=Sys.timezone())
+Activity$date <- format(Activity$ActivityDate, format = "%m/%d/%y")
+# sleep
+sleepDay$SleepDay=as.POSIXct(sleepDay$SleepDay, format="%m/%d/%Y %I:%M:%S %p", tz=Sys.timezone())
+sleepDay$date <- format(sleepDay$SleepDay, format = "%m/%d/%y")
+# weight
+weight$Date <- format(weight$Date, format = "%m/%d/%y")
+weight$time <- format(weight$Date, format = "%H:%M:%S")
 ```
 
-# Idenify all the columns in weight log
+# Identify all the observations with respect to their Id's
+
 ```{r}
-colnames(weight_log)
+n_distinct(Activity$Id)
+n_distinct(Calories$Id)
+n_distinct(Intensities$Id)
+n_distinct(sleepDay$Id)
+n_distinct(weight$Id)
+
 ```
-# Understanding some summary statistics
+
+# Take a look at the summary of the following files
+
+```{r}
+# activity
+Activity %>%  
+  select(TotalSteps,
+         TotalDistance,
+         SedentaryMinutes, Calories) %>%
+  summary()
+
+# explore num of active minutes per category
+Activity %>%
+  select(VeryActiveMinutes, FairlyActiveMinutes, LightlyActiveMinutes) %>%
+  summary()
+
+# calories
+Calories %>%
+  select(Calories) %>%
+  summary()
+# sleep
+sleepDay %>%
+  select(TotalSleepRecords, TotalMinutesAsleep, TotalTimeInBed) %>%
+  summary()
+# weight
+weight %>%
+  select(WeightKg, BMI) %>%
+  summary()
+```
+
+# Merging the data of sleepDay and Activity by Id and date
+
+```{r}
+merged_data <- merge(sleepDay, Activity, FUN=c("Id", "date"))
+head(merged_data)
+```
+
+# Understanding some summary statistics by visualization
+
 ```{r distinct users}
-n_distinct(daily_calories$Id)
-n_distinct(weight_log$Id)
+ggplot(data=Activity, aes(x=TotalSteps, y=Calories)) + 
+  geom_point() + geom_smooth() + labs(title="Total Steps vs. Calories")
+
+
 
 ```
-# Calculate the observations 
+# There is a positive correlation between Total Steps and Calories, which is obvious - the more active we are, the more calories we burn.
+# Let's Visualize the sleepDay dataframe
+```{r}
+ggplot(data=sleepDay, aes(x=TotalMinutesAsleep, y=TotalTimeInBed)) + 
+  geom_point()+ labs(title="Total Minutes Asleep vs. Total Time in Bed")
+```
+# The relationship between Total Minutes Asleep and Total Time in Bed looks linear. So if the Bellabeat users want to improve their sleep, we should consider using notification to go to sleep.
+
+# Again, intensities
 ```{r observations}
-nrow(daily_calories)
-nrow(weight_log)
-```
-# summary statistics of daily calories
-```{r}
-daily_calories %>%  
-  select(Id,
-         ActivityDay,
-         Calories) %>%
-  summary()
-```
-# For the weight_log dataframe
-```{r}
-weight_log %>%  
-  select(Id,
-  Date,
-  WeightKg, BMI,Fat) %>%
-  summary()
-```
-```{r}
-ggplot(data=daily_calories, aes(x=ActivityDay, y=Calories, fill=Id)) + geom_point()+
-  labs(title ="Relationship between ActivityDay and Calories Intake") 
-```
-# plotting the graph for weight_log
-```{r}
-ggplot(data=weight_log, aes(x=Date, y=BMI, fill=Id)) + geom_point() +
-  labs(title = "Relationship between Date and BMI rate as per Id's")
-```
+int_new <- Intensities %>%
+  group_by(time) %>%
+  drop_na() %>%
+  summarise(mean_total_int = mean(TotalIntensity))
 
-What could these trends tell you about how to help market this product? Or areas where you might want to explore further?
-
-## Merging these two datasets together
-How Calories intake and BMI rate influences health?
+ggplot(data=int_new, aes(x=time, y=mean_total_int)) + geom_histogram(stat = "identity", fill='red') +
+  theme(axis.text.x = element_text(angle = 90)) +
+  labs(title="Average Total Intensity vs. Time")
+```
+# By this graph,we found out that people are more active between 5 am and 10pm.
+# Then, visualize the merged data
 
 ```{r}
-combined_data <- merge(weight_log, daily_calories, by="Id")
-ggplot(data=combined_data,aes(x=Calories, y=BMI)) + 
-  geom_line()
+ggplot(data=merged_data, aes(x=TotalMinutesAsleep, y=SedentaryMinutes)) + 
+geom_point(color='darkblue') + geom_smooth() +
+  labs(title="Minutes Asleep vs. Sedentary Minutes")
 ```
+Here we can clearly see the negative relationship between Sedentary Minutes and Sleep time.
 
-# How many participants are there in data
+As an idea: if Bellabeat users want to improve their sleep, Bellabeat app can recommend reducing sedentary time.
+# For the weight dataframe
+
 ```{r}
-ggplot(data=combined_data,aes(x=Id, y=BMI)) + 
-  geom_line()
-n_distinct(combined_data$Id)
+ggplot(data=weight, aes(x=WeightKg, y=BMI)) + geom_point(color = 'Blue')+ geom_smooth() +
+  labs(title ="Relationship between Weightkg and BMI Intake") 
 ```
+A positive correlation obtained between them.
+# plotting the graph for estimating calories in relation to weightkg 
+
+```{r}
+merged_2 <- merge(weight, Activity, FUN=c("Id","Date"))
+head(merged_2)
+ggplot(data=merged_2, aes(x=WeightKg, y=Calories)) + geom_point(color = 'red') + geom_smooth()+
+  labs(title = "Relationship between WeightKg and Calories")
+```
+People of 80-100 weightkg are more active than other groups.
 
 
-# There were more participant Ids in the daily calories dataset that have been filtered out using merge.
+
+
