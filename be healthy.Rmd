@@ -166,8 +166,8 @@ People having 70-90 kg weight are having ideal BMI.
 # Plotting the graph between total steps and calculate their BMI as follows 
 
 ```{r}
-merged_2 <- merge(weight, Activity, FUN=c("Id","Date"))
-head(merged_2)
+merged_2 <- merge(weight, Activity, FUN=c("Id","Date")) 
+head(merged_2) 
 ggplot(data=merged_2, aes(x=TotalSteps, y=BMI)) + geom_point(color = 'red') + geom_smooth()+
   labs(title = "Relationship between BMI and Total Steps")
 ```
@@ -177,7 +177,7 @@ People having ideal BMI who are walking with more steps.
 ```{r}
 merged_2 <- merge(weight, Activity, FUN=c("Id","Date"))
 head(merged_2)
-ggplot(data=merged_2, aes(x=TotalSteps, y=Fat)) + geom_point(color = 'red') + geom_smooth()+
+ggplot(data=merged_2, aes(x=TotalSteps, y=Fat)) + geom_point(color = 'red') + geom_smooth() + 
   labs(title = "Relationship between Fat and Total Steps")
 ```
 # Those people who are moving with more steps having less amount of fat in their body.
