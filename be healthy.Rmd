@@ -162,17 +162,22 @@ As an idea: if Bellabeat users want to improve their sleep, Bellabeat app can re
 ggplot(data=weight, aes(x=WeightKg, y=BMI)) + geom_point(color = 'Blue')+ geom_smooth() +
   labs(title ="Relationship between Weightkg and BMI Intake") 
 ```
-A positive correlation obtained between them.
-# plotting the graph for estimating calories in relation to weightkg 
+People having 70-90 kg weight are having ideal BMI.
+# Plotting the graph between total steps and calculate their BMI as follows 
 
 ```{r}
 merged_2 <- merge(weight, Activity, FUN=c("Id","Date"))
 head(merged_2)
-ggplot(data=merged_2, aes(x=WeightKg, y=Calories)) + geom_point(color = 'red') + geom_smooth()+
-  labs(title = "Relationship between WeightKg and Calories")
+ggplot(data=merged_2, aes(x=TotalSteps, y=BMI)) + geom_point(color = 'red') + geom_smooth()+
+  labs(title = "Relationship between BMI and Total Steps")
 ```
-People of 80-100 weightkg are more active than other groups.
+People having ideal BMI who are walking with more steps.
 
-
-
-
+# Let's take a look on the relation between total steps and fat
+```{r}
+merged_2 <- merge(weight, Activity, FUN=c("Id","Date"))
+head(merged_2)
+ggplot(data=merged_2, aes(x=TotalSteps, y=Fat)) + geom_point(color = 'red') + geom_smooth()+
+  labs(title = "Relationship between Fat and Total Steps")
+```
+# Those people who are moving with more steps having less amount of fat in their body.
