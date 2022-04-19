@@ -3,7 +3,7 @@ title: "Be-Healthy"
 author: "Pooja Rathee"
 output:
   pdf_document: default
-date: '2022-04-08'
+date: '2022-04-19'
 ---
 
 ## First we install required packages and go through them
@@ -11,7 +11,10 @@ date: '2022-04-08'
 ```{r}
 library(tidyverse)
 library(ggplot2) 
+library(purrr)
+library(readr)
 library(scales)
+library(reshape2)
 
 
 ```
@@ -21,8 +24,9 @@ library(scales)
 ```{r}
 
 Activity <- read.csv("data/dailyActivity_merged.csv")
-Calories<- read.csv("data/hourlyCalories_merged.csv")
-Intensities <- read.csv("data/hourlyIntensities_merged.csv")
+Calories<- read.csv("data/dailyCalories_merged.csv")
+Intensities <- read.csv("data/dailyIntensities_merged.csv")
+Steps <- read.csv("data/dailySteps_merged.csv")
 sleepDay <- read.csv("data/sleepDay_merged.csv")
 weight <- read.csv("data/weightLogInfo_merged.csv")
 
@@ -34,150 +38,138 @@ weight <- read.csv("data/weightLogInfo_merged.csv")
 colnames(Activity)
 colnames(Calories)
 colnames(Intensities)
+colnames(Steps)
 colnames(sleepDay)
 colnames(weight)
 
 ```
-# Run the Head function
+
+# Merging activity and sleep data
 
 ```{r}
-head(Activity)
-head(Calories)
-head(Intensities)
-head(sleepDay)
-head(weight)
-```
+merge_1 <- merge(Activity,Calories, by = c("Id","Calories"))
+merge_2 <- merge(Intensities,Intensities, by = c("Id","ActivityDay","SedentaryMinutes", "LightlyActiveMinutes","FairlyActiveMinutes","VeryActiveMinutes", "SedentaryActiveDistance", "LightActiveDistance", "ModeratelyActiveDistance", "VeryActiveDistance"))
 
-## Take a look at the following data and format as date and time
+merge_daily <- merge(merge_1, merge_2, by = c("Id","ActivityDay","SedentaryMinutes", "LightlyActiveMinutes","FairlyActiveMinutes","VeryActiveMinutes", "SedentaryActiveDistance", "LightActiveDistance", "ModeratelyActiveDistance", "VeryActiveDistance")) %>%
+select(-ActivityDay) %>% rename(Date = ActivityDate)
 
-```{r}
-# intensities
-Intensities$ActivityHour=as.POSIXct(Intensities$ActivityHour, format="%m/%d/%Y %I:%M:%S %p", tz=Sys.timezone())
-Intensities$time <- format(Intensities$ActivityHour, format = "%H:%M:%S")
-Intensities$date <- format(Intensities$ActivityHour, format = "%m/%d/%y")
-# calories
-Calories$ActivityHour=as.POSIXct(Calories$ActivityHour, format="%m/%d/%Y %I:%M:%S %p", tz=Sys.timezone())
-Calories$time <- format(Calories$ActivityHour, format = "%H:%M:%S")
-Calories$date <- format(Calories$ActivityHour, format = "%m/%d/%y")
-# activity
-Activity$ActivityDate=as.POSIXct(Activity$ActivityDate, format="%m/%d/%Y", tz=Sys.timezone())
-Activity$date <- format(Activity$ActivityDate, format = "%m/%d/%y")
-# sleep
-sleepDay$SleepDay=as.POSIXct(sleepDay$SleepDay, format="%m/%d/%Y %I:%M:%S %p", tz=Sys.timezone())
-sleepDay$date <- format(sleepDay$SleepDay, format = "%m/%d/%y")
-# weight
-weight$Date <- format(weight$Date, format = "%m/%d/%y")
-weight$time <- format(weight$Date, format = "%H:%M:%S")
-```
+daily_data <- merge(merge_daily, sleepDay, by = "Id",all=TRUE) %>% drop_na() %>% select(-SleepDay, -TrackerDistance)
 
-# Identify all the observations with respect to their Id's
-
-```{r}
-n_distinct(Activity$Id)
-n_distinct(Calories$Id)
-n_distinct(Intensities$Id)
-n_distinct(sleepDay$Id)
-n_distinct(weight$Id)
 
 ```
 
-# Take a look at the summary of the following files
+## Take a look on the summary
 
 ```{r}
-# activity
-Activity %>%  
-  select(TotalSteps,
-         TotalDistance,
-         SedentaryMinutes, Calories) %>%
-  summary()
+summary(daily_data)
 
-# explore num of active minutes per category
-Activity %>%
-  select(VeryActiveMinutes, FairlyActiveMinutes, LightlyActiveMinutes) %>%
-  summary()
-
-# calories
-Calories %>%
-  select(Calories) %>%
-  summary()
-# sleep
-sleepDay %>%
-  select(TotalSleepRecords, TotalMinutesAsleep, TotalTimeInBed) %>%
-  summary()
-# weight
-weight %>%
-  select(WeightKg, BMI) %>%
-  summary()
 ```
 
-# Merging the data of sleepDay and Activity by Id and date
+# Categorize the data on the basis of active minutes
 
 ```{r}
-merged_data <- merge(sleepDay, Activity, FUN=c("Id", "date"))
-head(merged_data)
+data_by_usertype <- daily_data %>%
+summarise(
+user_type = factor(case_when(
+    SedentaryMinutes > mean(SedentaryMinutes) & LightlyActiveMinutes < mean(LightlyActiveMinutes) & FairlyActiveMinutes < mean(FairlyActiveMinutes) & VeryActiveMinutes < mean(VeryActiveMinutes) ~ "Sedentary",
+    SedentaryMinutes < mean(SedentaryMinutes) & LightlyActiveMinutes > mean(LightlyActiveMinutes) & FairlyActiveMinutes < mean(FairlyActiveMinutes) & VeryActiveMinutes < mean(VeryActiveMinutes) ~ "Lightly Active",
+    SedentaryMinutes < mean(SedentaryMinutes) & LightlyActiveMinutes < mean(LightlyActiveMinutes) & FairlyActiveMinutes > mean(FairlyActiveMinutes) & VeryActiveMinutes < mean(VeryActiveMinutes) ~ "Fairly Active",
+    SedentaryMinutes < mean(SedentaryMinutes) & LightlyActiveMinutes < mean(LightlyActiveMinutes) & FairlyActiveMinutes < mean(FairlyActiveMinutes) & VeryActiveMinutes > mean(VeryActiveMinutes) ~ "Very Active",
+),levels=c("Sedentary", "Lightly Active", "Fairly Active", "Very Active")), Calories, .group=Id) %>% drop_na()
+
 ```
 
+# Visualize both the user type distribution and the calories burned for every user type:
+
+```{r}
+data_by_usertype %>%
+group_by(user_type) %>%
+summarise(total = n()) %>%
+mutate(totals = sum(total)) %>%
+group_by(user_type) %>%
+summarise(total_percent = total / totals) %>%
+ggplot(aes(user_type,y=total_percent, fill=user_type)) +
+    geom_col()+
+    scale_y_continuous(labels = scales::percent) +
+    theme(legend.position="none") +
+    labs(title="User type distribution", x=NULL) +
+    theme(legend.position="none", text = element_text(size = 10),plot.title = element_text(hjust = 0.5))
+
+ggplot(data_by_usertype, aes(user_type, Calories, fill=user_type)) +
+    geom_boxplot() +
+    theme(legend.position="none") +
+    labs(title="Calories burned by User type", x=NULL) +
+    theme(legend.position="none", text = element_text(size = 10),plot.title = element_text(hjust = 0.5))
+
+```
+The users are mostly sedentary or Lightly active users but it's very interesting to see that even though they are the biggest category the Fairly active and most importantly, the Very active are the ones with more calories burned. 
+# To check the relation between Distance/Steps and Calories burned by plotting them:
+
+```{r}
+daily_data %>%
+summarise(
+distance = factor(case_when(
+    TotalDistance < 4.5 ~ "< 4.5 mi",
+    TotalDistance >= 4.5 & TotalDistance <= 7 ~ "4.5 > & < 7 mi",
+    TotalDistance > 7 ~ "> 7 mi",
+),levels = c("> 7 mi","4.5 > & < 7 mi","< 4.5 mi")),
+steps = factor(case_when(
+    TotalSteps < 6000 ~ "< 6k steps",
+    TotalSteps >= 6000 & TotalSteps <= 10000 ~ "6k > & < 10k Steps",
+    TotalSteps > 10000 ~ "> 10k Steps",
+),levels = c("> 10k Steps","6k > & < 10k Steps","< 6k steps")),
+Calories) %>%
+ggplot(aes(steps,Calories,fill=steps)) +
+    geom_boxplot() +
+    facet_wrap(~distance)+
+    labs(title="Calories burned by Steps and Distance",x=NULL) +
+    theme(legend.position="none", text = element_text(size = 6),plot.title = element_text(hjust = 0.5))
+
+```
+The most calories burned are the "6k > & < 10k Steps" and "> 7 miles" which would indicate some kind of running activity that allows the user to traverse more distance with less steps.
 # Understanding some summary statistics by visualization
 
 ```{r distinct users}
-ggplot(data=Activity, aes(x=TotalSteps, y=Calories)) + 
-  geom_point() + geom_smooth() + labs(title="Total Steps vs. Calories")
+#Now let's focus on the sleep quality, for that I will now make categories for the sleeping time and I will make a new table with the sleeping categories percent for each individual user type:
+sleepType_by_userType <- daily_data %>%
+group_by(Id) %>%
+summarise(user_type = factor(case_when(
+    SedentaryMinutes > mean(SedentaryMinutes) & LightlyActiveMinutes < mean(LightlyActiveMinutes) & FairlyActiveMinutes < mean(FairlyActiveMinutes) & VeryActiveMinutes < mean(VeryActiveMinutes) ~ "Sedentary",
+    SedentaryMinutes < mean(SedentaryMinutes) & LightlyActiveMinutes > mean(LightlyActiveMinutes) & FairlyActiveMinutes < mean(FairlyActiveMinutes) & VeryActiveMinutes < mean(VeryActiveMinutes) ~ "Lightly Active",
+    SedentaryMinutes < mean(SedentaryMinutes) & LightlyActiveMinutes < mean(LightlyActiveMinutes) & FairlyActiveMinutes > mean(FairlyActiveMinutes) & VeryActiveMinutes < mean(VeryActiveMinutes) ~ "Fairly Active",
+    SedentaryMinutes < mean(SedentaryMinutes) & LightlyActiveMinutes < mean(LightlyActiveMinutes) & FairlyActiveMinutes < mean(FairlyActiveMinutes) & VeryActiveMinutes > mean(VeryActiveMinutes) ~ "Very Active",
+),levels=c("Sedentary", "Lightly Active", "Fairly Active", "Very Active")),
+sleep_type = factor(case_when(
+    mean(TotalMinutesAsleep) < 360 ~ "Bad Sleep",
+    mean(TotalMinutesAsleep) > 360 & mean(TotalMinutesAsleep) <= 480 ~ "Normal Sleep",
+    mean(TotalMinutesAsleep) > 480 ~ "Over Sleep"),levels=c("Bad Sleep", "Normal Sleep", "Over Sleep")), total_sleep = sum(TotalMinutesAsleep) ,.groups="drop"
+) %>%
+drop_na() %>%
+group_by(user_type) %>%
+summarise(bad_sleepers = sum(sleep_type == "Bad Sleep"), normal_sleepers = sum(sleep_type == "Normal Sleep"),over_sleepers = sum(sleep_type == "Over Sleep"),total=n(),.groups="drop") %>%
+group_by(user_type) %>%
+summarise(
+    bad_sleepers = bad_sleepers / total, 
+    normal_sleepers = normal_sleepers / total, 
+    over_sleepers = over_sleepers / total,
+    .groups="drop"
 
+)
 
 
 ```
-# There is a positive correlation between Total Steps and Calories, which is obvious - the more active we are, the more calories we burn.
-# Let's Visualize the sleepDay dataframe
-```{r}
-ggplot(data=sleepDay, aes(x=TotalMinutesAsleep, y=TotalTimeInBed)) + 
-  geom_point()+ labs(title="Total Minutes Asleep vs. Total Time in Bed")
-```
-# The relationship between Total Minutes Asleep and Total Time in Bed looks linear. So if the Bellabeat users want to improve their sleep, we should consider using notification to go to sleep.
 
-# Again, intensities
-```{r observations}
-int_new <- Intensities %>%
-  group_by(time) %>%
-  drop_na() %>%
-  summarise(mean_total_int = mean(TotalIntensity))
-
-ggplot(data=int_new, aes(x=time, y=mean_total_int)) + geom_histogram(stat = "identity", fill='red') +
-  theme(axis.text.x = element_text(angle = 90)) +
-  labs(title="Average Total Intensity vs. Time")
-```
-# By this graph,we found out that people are more active between 5 am and 10pm.
-# Then, visualize the merged data
-
-```{r}
-ggplot(data=merged_data, aes(x=TotalMinutesAsleep, y=SedentaryMinutes)) + 
-geom_point(color='darkblue') + geom_smooth() +
-  labs(title="Minutes Asleep vs. Sedentary Minutes")
-```
-Here we can clearly see the negative relationship between Sedentary Minutes and Sleep time.
-
-As an idea: if Bellabeat users want to improve their sleep, Bellabeat app can recommend reducing sedentary time.
-# For the weight dataframe
+#Now we can plot the data for each user type:
 
 ```{r}
-ggplot(data=weight, aes(x=WeightKg, y=BMI)) + geom_point(color = 'Blue')+ geom_smooth() +
-  labs(title ="Relationship between Weightkg and BMI Intake") 
-```
-People having 70-90 kg weight are having ideal BMI.
-# Plotting the graph between total steps and calculate their BMI as follows 
+sleepType_by_userType_melted<- melt(sleepType_by_userType, id.vars = "user_type")
 
-```{r}
-merged_2 <- merge(weight, Activity, FUN=c("Id","Date")) 
-head(merged_2) 
-ggplot(data=merged_2, aes(x=TotalSteps, y=BMI)) + geom_point(color = 'red') + geom_smooth()+
-  labs(title = "Relationship between BMI and Total Steps")
+ggplot(sleepType_by_userType_melted, aes(user_type, value, fill = variable)) +
+geom_bar(position = "dodge", stat = "identity") +
+scale_y_continuous(labels = scales::percent) +
+labs(x=NULL, fill="Sleep type") + 
+theme(legend.position="bottom",text = element_text(size = 10),plot.title = element_text(hjust = 0.5))
 ```
-People having ideal BMI who are walking with more steps.
+It shows very clearly the relation between the activity level and sleep quality as in the sedentary users we find the largest percentage of bad sleepers and with some activity (even very little activity) we see a great increase of normal sleepers.
 
-# Let's take a look on the relation between total steps and fat
-```{r}
-merged_2 <- merge(weight, Activity, FUN=c("Id","Date"))
-head(merged_2)
-ggplot(data=merged_2, aes(x=TotalSteps, y=Fat)) + geom_point(color = 'red') + geom_smooth() + 
-  labs(title = "Relationship between Fat and Total Steps")
-```
-# Those people who are moving with more steps having less amount of fat in their body.
+
